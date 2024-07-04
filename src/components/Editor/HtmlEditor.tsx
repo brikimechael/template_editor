@@ -1,84 +1,12 @@
-import React, { useState, useRef, useMemo } from 'react';
-import ReactQuill, { Quill } from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import ImageResize from 'quill-image-resize-module-react';
+import React, { useState, useRef } from 'react';
 import { AppBar, Toolbar, IconButton, Select, MenuItem, Box, Container, Dialog, DialogTitle, DialogContent, Paper, TextField, Button, Stepper, Step, StepLabel, InputLabel, FormControl, Grid, Card, CardHeader, CardContent, List, ListItem, ListItemText } from '@mui/material';
-import { FormatBold, FormatItalic, FormatUnderlined, FormatColorText, FormatColorFill, Image, Code, Html, Visibility, ViewComfy, PostAdd } from '@mui/icons-material';
-import { SketchPicker, ColorChangeHandler } from 'react-color';
+import { FormatBold, FormatItalic, FormatUnderlined, FormatColorText, FormatColorFill, Image, Code, Html, Visibility, ViewComfy, PostAdd, Margin } from '@mui/icons-material';
+import { SketchPicker } from 'react-color';
 import DOMPurify from 'dompurify';
 import CloseIcon from '@mui/icons-material/Close';
-
-Quill.register('modules/imageResize', ImageResize);
-
-const CustomDelimiterSelect = () => {
-  const quill = Quill.import('core/quill');
-  return (
-    <Select
-      value="${}"
-      onChange={(e) => {
-        const quillElement = document.querySelector('.quill-editor');
-        if (quillElement) {
-          const quill = Quill.find(quillElement as Element);
-          if (quill) {
-            const selection = quill.getSelection();
-            if (selection) {
-              const text = quill.getText(selection.index, selection.length);
-              let wrappedText;
-              switch (e.target.value) {
-                case '${}':
-                  wrappedText = `\${${text}}`;
-                  break;
-                case "[[]]":
-                  wrappedText = `[[${text}]]`;
-                  break;
-                case "{{}}":
-                  wrappedText = `{{${text}}}`;
-                  break;
-                default:
-                  wrappedText = text;
-                  break;
-              }
-              quill.deleteText(selection.index, selection.length);
-              quill.insertText(selection.index, wrappedText);
-            }
-          }
-        }
-      }}
-      sx={{ ml: 1, mr: 1, minWidth: 70 }}
-    >
-      <MenuItem value="${}">{'${}'}</MenuItem>
-      <MenuItem value="[[]]">{'[[]]'}</MenuItem>
-      <MenuItem value="{{}}">{'{{}}'}</MenuItem>
-    </Select>
-  );
-};
-
-// Add custom delimiter button to toolbar
-const CustomToolbar = () => (
-  <div id="toolbar">
-    <select className="ql-header" defaultValue={""} onChange={e => e.persist()}>
-      <option value="1">Heading</option>
-      <option value="2">Subheading</option>
-      <option value="">Normal</option>
-    </select>
-    <button className="ql-bold" />
-    <button className="ql-italic" />
-    <button className="ql-underline" />
-    <button className="ql-strike" />
-    <select className="ql-color" />
-    <select className="ql-background" />
-    <button className="ql-link" />
-    <button className="ql-image" />
-    <button className="ql-list" value="ordered" />
-    <button className="ql-list" value="bullet" />
-    <button className="ql-indent" value="-1" />
-    <button className="ql-indent" value="+1" />
-    <CustomDelimiterSelect />
-    <button className="ql-code-block" />
-  </div>
-);
-
-const HtmlEditor: React.FC = () => {
+import ContentEditable, { ContentEditableEvent } from 'react-contenteditable';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+const HtmlEditor = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [editorState, setEditorState] = useState({
     modelName: '',
@@ -90,7 +18,7 @@ const HtmlEditor: React.FC = () => {
     displayMode: 'both'
   });
 
-  const quillRef = useRef<ReactQuill>(null);
+  const contentEditableRef = useRef<HTMLElement>(null);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -104,165 +32,298 @@ const HtmlEditor: React.FC = () => {
     console.log("Finished:", editorState);
   };
 
-  const handleColorChange: ColorChangeHandler = (color) => {
+  const applyStyle = (command: string, value: string | undefined = undefined) => {
+    if (!contentEditableRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+
+    let newElement: HTMLElement;
+    switch (command) {
+      case 'bold':
+        newElement = document.createElement('strong');
+        break;
+      case 'italic':
+        newElement = document.createElement('i');
+        break;
+      case 'underline':
+        newElement = document.createElement('u');
+        break;
+      case 'foreColor':
+        newElement = document.createElement('span');
+        newElement.style.color = value || '';
+        break;
+      case 'hiliteColor':
+        newElement = document.createElement('span');
+        newElement.style.backgroundColor = value || '';
+        break;
+      default:
+        return;
+    }
+
+    newElement.textContent = selectedText;
+    range.deleteContents();
+    range.insertNode(newElement);
+
+    range.setStartAfter(newElement);
+    range.setEndAfter(newElement);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    updateContent();
+  };
+
+  const handleColorChange = (color: { hex: string }) => {
     setEditorState(prev => ({ ...prev, currentColor: color.hex }));
-    const editor = quillRef.current?.getEditor();
-    if (editor) {
-      if (editorState.colorPickerType === 'text') {
-        editor.format('color', color.hex);
-      } else {
-        editor.format('background', color.hex);
+    applyStyle(editorState.colorPickerType === 'text' ? 'foreColor' : 'hiliteColor', color.hex);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Image = e.target?.result as string;
+        const imgElement = document.createElement('img');
+        imgElement.src = base64Image;
+        imgElement.alt = file.name;
+        imgElement.style.maxWidth = '100%';
+
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.insertNode(imgElement);
+          range.setStartAfter(imgElement);
+          range.setEndAfter(imgElement);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+
+        updateContent();
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const wrapSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const selectedText = range.toString();
+      if (selectedText) {
+        let wrappedText;
+        switch (editorState.delimiter) {
+          case '${}':
+            wrappedText = `\${${selectedText}}`;
+            break;
+          case "[[]]":
+            wrappedText = `[[${selectedText}]]`;
+            break;
+          case "{{}}":
+            wrappedText = `{{${selectedText}}}`;
+            break;
+          default:
+            wrappedText = selectedText;
+            break;
+        }
+        const textNode = document.createTextNode(wrappedText);
+        range.deleteContents();
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        updateContent();
       }
     }
   };
 
-  const handleEditorChange = (content: string) => {
-    setEditorState(prev => ({ ...prev, content }));
+  const updateContent = () => {
+    if (contentEditableRef.current) {
+      const newContent = contentEditableRef.current.innerHTML;
+      setEditorState(prev => ({ ...prev, content: newContent }));
+    }
   };
 
-  const modules = useMemo(() => ({
-    toolbar: {
-      container: '#toolbar',
-    },
-    imageResize: {
-      parchment: Quill.import('parchment'),
-      modules: ['Resize', 'DisplaySize']
-    }
-  }), []);
+  const handleEditorChange = (evt: ContentEditableEvent) => {
+    const newContent = evt.target.value;
+    setEditorState(prev => ({ ...prev, content: newContent }));
+  };
 
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet', 'indent',
-    'link', 'image', 'color', 'background',
-    'code-block'
-  ];
+  const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setEditorState(prev => ({ ...prev, content: newContent }));
+  };
 
   const renderStepContent = (step: number) => {
     switch (step) {
       case 0:
-        // Model Setup step (unchanged)
         return (
-          <Box>
-            <TextField
-              required
-              fullWidth
-              label="Model Name"
-              value={editorState.modelName}
-              onChange={(e) => setEditorState(prev => ({ ...prev, modelName: e.target.value }))}
-              margin="normal"
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="select-delimiter">Delimiter</InputLabel>
-              <Select
-                labelId="select-delimiter"
-                label="Delimiter"
-                value={editorState.delimiter}
-                onChange={(e) => setEditorState(prev => ({ ...prev, delimiter: e.target.value as string }))}
-                margin="dense"
+            <Box>
+              <TextField
+                  required
+                  fullWidth
+                  label="Model Name"
+                  value={editorState.modelName}
+                  onChange={(e) => setEditorState(prev => ({ ...prev, modelName: e.target.value }))}
+                  margin="normal"
+              />
+              <FormControl fullWidth margin="normal"
               >
-                <MenuItem value="${}">{'${}'}</MenuItem>
-                <MenuItem value="[[]]">{'[[]]'}</MenuItem>
-                <MenuItem value="{{}}">{'{{}}'}</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+
+                <InputLabel id="select-delimiter">Delimiter</InputLabel>
+
+                <Select
+                    labelId="select-delimiter"
+                    label="Delimiter"
+                    value={editorState.delimiter}
+                    onChange={(e) => setEditorState(prev => ({ ...prev, delimiter: e.target.value as string }))}
+                    margin="dense"
+                >
+                  <MenuItem value="${}">{'${}'}</MenuItem>
+                  <MenuItem value="[[]]">{'[[]]'}</MenuItem>
+                  <MenuItem value="{{}}">{'{{}}'}</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
         );
       case 1:
-        // Template Editor step
         return (
-          <Container maxWidth="md">
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-              <Select
-                value={editorState.displayMode}
-                onChange={(e) => setEditorState(prev => ({ ...prev, displayMode: e.target.value as string }))}
-              >
-                <MenuItem value="html"><Html /></MenuItem>
-                <MenuItem value="preview"><Visibility /></MenuItem>
-                <MenuItem value="both"><ViewComfy /></MenuItem>
-              </Select>
-            </Box>
-
-            <Paper elevation={3} sx={{ mb: 2, p: 2 }}>
-              {(editorState.displayMode === 'preview' || editorState.displayMode === 'both') && (
-                <Box>
-                  <CustomToolbar />
-                  <ReactQuill
-                    ref={quillRef}
-                    value={editorState.content}
-                    onChange={handleEditorChange}
-                    modules={modules}
-                    formats={formats}
-                    className="quill-editor"
-                  />
-                </Box>
-              )}
-              {(editorState.displayMode === 'html' || editorState.displayMode === 'both') && (
-                <TextField
-                  multiline
-                  fullWidth
-                  variant="outlined"
-                  value={editorState.content}
-                  onChange={(e) => setEditorState(prev => ({ ...prev, content: e.target.value }))}
-                  InputProps={{
-                    style: { 
-                      direction: 'ltr', 
-                      textAlign: 'left', 
-                      fontFamily: 'monospace',
-                      whiteSpace: 'pre-wrap'
-                    }
-                  }}
-                />
-              )}
-            </Paper>
-
-            <Dialog open={editorState.showColorPicker} onClose={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}>
-              <DialogTitle>
-                {editorState.colorPickerType === 'text' ? 'Text Color' : 'Background Color'}
-                <IconButton
-                  onClick={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}
-                  sx={{ position: 'absolute', right: 8, top: 8 }}
+            <Container maxWidth="md">
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                <Select
+                    value={editorState.displayMode}
+                    onChange={(e) => setEditorState(prev => ({ ...prev, displayMode: e.target.value as string }))}
                 >
-                  <CloseIcon />
-                </IconButton>
-              </DialogTitle>
-              <DialogContent>
-                <SketchPicker color={editorState.currentColor} onChange={handleColorChange} />
-              </DialogContent>
-            </Dialog>
-          </Container>
+                  <MenuItem value="html"><Html /></MenuItem>
+                  <MenuItem value="preview"><Visibility /></MenuItem>
+                  <MenuItem value="both"><ViewComfy /></MenuItem>
+                </Select>
+              </Box>
+
+              <Paper elevation={3} sx={{ mb: 2, p: 2 }}>
+                {(editorState.displayMode === 'preview' || editorState.displayMode === 'both') && (
+                    <Box>
+                      <AppBar position="static" color="default" sx={{ mb: 2 }}>
+                        <Toolbar variant="dense">
+                          <IconButton
+                              onClick={() => applyStyle('bold')}
+                              //color={contentEditableRef.current?.querySelector('strong') ? 'primary' : 'default'}
+                          >
+                            <FormatBold />
+                          </IconButton>
+                          <IconButton
+                              onClick={() => applyStyle('italic')}
+                              //color={contentEditableRef.current?.querySelector('em') ? 'primary' : 'default'}
+                          >
+                            <FormatItalic />
+                          </IconButton>
+                          <IconButton onClick={() => applyStyle('underline')}><FormatUnderlined /></IconButton>
+                          <IconButton onClick={() => setEditorState(prev => ({ ...prev, colorPickerType: 'text', showColorPicker: true }))}><FormatColorText /></IconButton>
+                          <IconButton onClick={() => setEditorState(prev => ({ ...prev, colorPickerType: 'background', showColorPicker: true }))}><FormatColorFill /></IconButton>
+                          <IconButton component="label">
+                            <Image />
+                            <input type="file" hidden onChange={handleImageUpload} accept="image/*" />
+                          </IconButton>
+                          <Select
+                              value={editorState.delimiter}
+                              onChange={(e) => setEditorState(prev => ({ ...prev, delimiter: e.target.value as string }))}
+                              sx={{ ml: 1, mr: 1, minWidth: 70 }}
+                          >
+                            <MenuItem value="${}">{'${}'}</MenuItem>
+                            <MenuItem value="[[]]">{'[[]]'}</MenuItem>
+                            <MenuItem value="{{}}">{'{{}}'}</MenuItem>
+                          </Select>
+                          <IconButton onClick={wrapSelection}><Code /></IconButton>
+                        </Toolbar>
+                      </AppBar>
+                      <ContentEditable
+                          html={DOMPurify.sanitize(editorState.content)}
+                          disabled={false}
+                          onChange={handleEditorChange}
+                          tagName="div"
+                          innerRef={contentEditableRef}
+                          style={{
+                            direction: 'ltr',
+                            textAlign: 'left',
+                            border: '1px solid #ccc',
+                            minHeight: '200px',
+                            padding: '10px',
+                            whiteSpace: 'pre-wrap',
+                            unicodeBidi: 'plaintext'
+                          }}
+                      />
+                    </Box>
+                )}
+                {(editorState.displayMode === 'html' || editorState.displayMode === 'both') && (
+                    <TextField
+                        multiline
+                        fullWidth
+                        variant="outlined"
+                        value={editorState.content}
+                        onChange={handleHtmlChange}
+                        InputProps={{
+                          style: {
+                            direction: 'ltr',
+                            textAlign: 'left',
+                            fontFamily: 'monospace',
+                            whiteSpace: 'pre-wrap'
+                          }
+                        }}
+                    />
+                )}
+              </Paper>
+
+              <Dialog open={editorState.showColorPicker} onClose={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}>
+                <DialogTitle>
+                  {editorState.colorPickerType === 'text' ? 'Text Color' : 'Background Color'}
+                  <IconButton
+                      onClick={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}
+                      sx={{ position: 'absolute', right: 8, top: 8 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                  <SketchPicker color={editorState.currentColor} onChange={handleColorChange} />
+                </DialogContent>
+              </Dialog>
+            </Container>
         );
       case 2:
-        // Preview step (unchanged)
         return (
-          <Grid item xs={12}>
-            <Card sx={{margin:'20px'}}>
-              <CardHeader 
-                avatar={<PostAdd />} 
-                title="Infos" 
-              />
-              <CardContent>
-                <List>
-                  <ListItem>
-                    <ListItemText primary="Model Name" secondary={editorState.modelName} />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText primary="Delimiter" secondary={editorState.delimiter} />
-                  </ListItem>
-                </List>
-              </CardContent>
-            </Card>
-            
-            <Card sx={{margin:'20px'}}>
-              <CardHeader 
-                avatar={<Html />} 
-                title="Content" 
-              />
-              <CardContent>
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorState.content) }} />
-              </CardContent>
-            </Card>
-          </Grid>
+            <Grid item xs={12} >
+              <Card sx={{margin:'20px'}}>
+                <CardHeader
+                    avatar={<PostAdd />}
+                    title="Infos"
+                />
+                <CardContent>
+                  <List>
+                    <ListItem>
+                      <ListItemText primary="Model Name" secondary={editorState.modelName} />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText primary="Delimiter" secondary={editorState.delimiter} />
+                    </ListItem>
+                  </List>
+                </CardContent>
+              </Card>
+
+              <Card sx={{margin:'20px'}}>
+                <CardHeader
+                    avatar={<Html />}
+                    title="Content"
+                />
+                <CardContent>
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editorState.content) }} />
+                </CardContent>
+              </Card>
+            </Grid>
+
         );
       default:
         return 'Unknown step';
@@ -270,32 +331,46 @@ const HtmlEditor: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="md">
-      <Stepper activeStep={activeStep}>
-        <Step><StepLabel>Model Setup</StepLabel></Step>
-        <Step><StepLabel>Template Editor</StepLabel></Step>
-        <Step><StepLabel>Preview</StepLabel></Step>
-      </Stepper>
-      <Paper elevation={3} sx={{ mt: 2, mb: 2, p: 2 }}>
-        {renderStepContent(activeStep)}
-        <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
-          <Button
-            color="inherit"
-            disabled={activeStep === 0}
-            onClick={handleBack}
-            sx={{ mr: 1 }}
-          >
-            Back
-          </Button>
-          <Box sx={{ flex: '1 1 auto' }} />
-          {activeStep === 2 ? (
-            <Button onClick={handleFinish}>Finish</Button>
-          ) : (
-            <Button onClick={handleNext}>Next</Button>
-          )}
-        </Box>
-      </Paper>
-    </Container>
+      <Container maxWidth="md">
+        <Stepper activeStep={activeStep}>
+          <Step><StepLabel>Model Setup</StepLabel></Step>
+          <Step><StepLabel>Template Editor</StepLabel></Step>
+          <Step><StepLabel>Preview</StepLabel></Step>
+        </Stepper>
+        <Paper elevation={3} sx={{ mt: 2, mb: 2, p: 2 }}>
+          {renderStepContent(activeStep)}
+          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+            <Button
+                color="inherit"
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                sx={{ mr: 1 }}
+            >
+              Back
+            </Button>
+            <Box sx={{ flex: '1 1 auto' }} />
+            {activeStep === 2 ? (
+                <Button onClick={handleFinish}>Finish</Button>
+            ) : (
+                <Button onClick={handleNext}>Next</Button>
+            )}
+          </Box>
+        </Paper>
+
+        <Dialog open={editorState.showColorPicker} onClose={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}>
+          <DialogTitle>
+            {editorState.colorPickerType === 'text' ? 'Text Color' : 'Background Color'}
+            <IconButton
+                onClick={() => setEditorState(prev => ({ ...prev, showColorPicker: false }))}
+                sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <SketchPicker color={editorState.currentColor} onChange={handleColorChange} />
+          </DialogContent>      </Dialog>
+      </Container>
   );
 };
 
