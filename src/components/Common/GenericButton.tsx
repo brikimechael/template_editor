@@ -1,7 +1,7 @@
 import styled from '@emotion/styled'
 
 const Wrapper = styled.button`
- font-family: 'Space Mono';
+ font-family: 'Space Mono',serif;
   font-style: normal;
   font-weight: bold;
   font-size: 16px;

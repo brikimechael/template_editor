@@ -36,3 +36,9 @@
     transform: rotate(360deg);
   }
 }
+@media (min-width:400px){
+  .css-1h61cah-MuiContainer-root{
+    width: max-content;
+    padding-left:24px;padding-right:24px;
+  }
+}

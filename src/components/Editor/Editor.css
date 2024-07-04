@@ -1,0 +1,11 @@
+.ql-picker.ql-delimiter .ql-picker-label::before {
+    content: attr(data-value);
+    display: inline-block;
+    vertical-align: middle;
+    width: 18px;
+    height: 18px;
+    background-size: 18px 18px;
+    margin-right: 1em;
+    margin-inside: 1em;
+}
+

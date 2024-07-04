@@ -1,9 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
-import  smsDetailsSlice  from './sms/smsDetailsSlice';
+import  eventDetailsSlice  from './event/eventDetailsSlice';
 
 const store = configureStore({
   reducer: {
-    smsDetails: smsDetailsSlice,
+    eventDetails: eventDetailsSlice,
   },
 });
 

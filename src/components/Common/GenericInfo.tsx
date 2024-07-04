@@ -3,7 +3,7 @@ import styled from '@emotion/styled'
 
   const Info = styled.div`
   h2 {
-    font-family: 'Space Mono';
+    font-family: 'Space Mono',serif;
     font-style: normal;
     font-weight: bold;
     font-size: 64px;
