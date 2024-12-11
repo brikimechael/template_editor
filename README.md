@@ -7,6 +7,7 @@ This project is a React-based frontend application built with **React 18** and *
 - **Event Viewer**: Displays a list of events with search and filter functionality.
 - **Template Builder**: Allows creating, editing, and managing templates using the **React-Quill** library.
 - **Custom Variable Management**: Add and configure variables for different templating engines.
+- **Resume Translator**: Translates a resume template to different languages. (why not 😄)
 - **Backend Integration**: Supports rendering templates via REST API.
 
 ## Tech Stack

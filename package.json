@@ -11,7 +11,7 @@
     "@mui/material": "^5.15.20",
     "@mui/styled-engine": "^5.15.14",
     "@mui/x-data-grid": "^7.10.0",
-    "@reduxjs/toolkit": "^2.2.5",
+    "@reduxjs/toolkit": "^2.5.0",
     "@types/dompurify": "^3.0.5",
     "@types/react-color": "^3.0.12",
     "@usewaypoint/email-builder": "^0.0.8",
@@ -31,11 +31,15 @@
     "react-router-dom": "^6.24.0",
     "react-scripts": "^5.0.1",
     "react-spinners": "^0.14.1",
+    "reselect": "^5.1.1",
     "rsuite": "^5.66.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
     "typescript": "^4.4.2"
   },
   "scripts": {
